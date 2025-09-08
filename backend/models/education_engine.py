@@ -517,6 +517,32 @@ class EducationEngine:
             }
         ]
     
+    def get_available_modules(self, language: str = 'en', difficulty_filter: str = None) -> List[Dict]:
+        """Get list of available educational modules."""
+        try:
+            modules = []
+            for module_id, module_data in self.learning_modules.items():
+                # Filter by difficulty if specified
+                if difficulty_filter and module_data.get('level') != difficulty_filter:
+                    continue
+                
+                # Create module summary
+                module_summary = {
+                    'id': module_data['id'],
+                    'title': module_data['title'],
+                    'description': module_data['description'],
+                    'level': module_data['level'],
+                    'estimated_time': module_data['estimated_time'],
+                    'topics': module_data['topics'],
+                    'prerequisites': module_data.get('prerequisites', [])
+                }
+                modules.append(module_summary)
+            
+            return modules
+        except Exception as e:
+            logger.error(f"Error getting available modules: {e}")
+            return []
+    
     def get_educational_content(self, user_id: int, content_type: str = 'module',
                               difficulty_level: str = 'beginner', topics: List[str] = None) -> Dict[str, Any]:
         """Get personalized educational content for a user."""

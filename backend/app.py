@@ -213,7 +213,7 @@ def register():
         db.session.commit()
         
         # Create access token
-        access_token = create_access_token(identity=user.id)
+        access_token = create_access_token(identity=str(user.id))
         
         return jsonify({
             'message': 'User registered successfully',
@@ -247,10 +247,13 @@ def login():
         if not username or not password:
             return jsonify({'error': 'Username and password are required'}), 400
         
+        # Try to find user by username first, then by email
         user = User.query.filter_by(username=username).first()
+        if not user:
+            user = User.query.filter_by(email=username).first()
         
         if user and check_password_hash(user.password_hash, password):
-            access_token = create_access_token(identity=user.id)
+            access_token = create_access_token(identity=str(user.id))
             
             return jsonify({
                 'access_token': access_token,
@@ -274,7 +277,7 @@ def login():
 def get_user_stats():
     """Get user statistics and analytics"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         # Get user verification stats
         verifications = Verification.query.filter_by(user_id=user_id).all()
@@ -324,7 +327,7 @@ def get_user_stats():
 def user_profile():
     """Get or update user profile"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
         
         if not user:
@@ -375,7 +378,7 @@ def verify_content():
     start_time = datetime.utcnow()
     
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
         
         content = data.get('content')
@@ -467,13 +470,83 @@ def verify_content():
         logger.error(f"Verification error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/api/verify-url', methods=['POST'])
+@limiter.limit("30 per minute")
+@jwt_required()
+def verify_url():
+    """URL verification endpoint"""
+    try:
+        user_id = int(get_jwt_identity())
+        data = request.get_json()
+        
+        url = data.get('url')
+        content_type = data.get('content_type', 'url')
+        
+        if not url:
+            return jsonify({'error': 'URL is required'}), 400
+        
+        # Basic URL validation
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                return jsonify({'error': 'Invalid URL format'}), 400
+        except:
+            return jsonify({'error': 'Invalid URL format'}), 400
+        
+        # For now, we'll treat URL verification as text verification
+        # In a real implementation, you'd fetch the content from the URL
+        verification_result = verification_engine.verify_content(
+            content=f"URL: {url}",
+            content_type='text',
+            language='auto-detect',
+            user_context={'user_id': user_id}
+        )
+        
+        # Save verification record
+        verification = Verification(
+            user_id=user_id,
+            content_hash=hash(url),  # Simple hash for URL
+            content_type='url',
+            original_content=url,
+            result=verification_result['result'],
+            confidence_score=verification_result['confidence_score'],
+            analysis_details={
+                'url': url,
+                'verification_type': 'url_analysis',
+                'analysis_details': verification_result.get('analysis_details', {})
+            }
+        )
+        
+        db.session.add(verification)
+        db.session.commit()
+        
+        # Update user literacy score
+        user = User.query.get(user_id)
+        user.literacy_score = calculate_user_literacy_score(user_id)
+        db.session.commit()
+        
+        return jsonify({
+            'verification_id': verification.id,
+            'result': verification_result['result'],
+            'confidence_score': verification_result['confidence_score'],
+            'analysis_details': verification.analysis_details,
+            'url': url,
+            'educational_tip': verification_result.get('educational_tip'),
+            'sources': verification_result.get('sources', [])
+        })
+    
+    except Exception as e:
+        logger.error(f"URL verification error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/api/analyze-image', methods=['POST'])
 @limiter.limit("20 per minute")
 @jwt_required()
 def analyze_image():
     """Image verification endpoint"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         
         if 'image' not in request.files:
             return jsonify({'error': 'No image file provided'}), 400
@@ -556,7 +629,7 @@ def analyze_image():
 def get_verification_history():
     """Get user's verification history"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
         content_type = request.args.get('content_type')
@@ -609,7 +682,7 @@ def get_verification_history():
 def get_education_modules():
     """Get available educational modules"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         difficulty = request.args.get('difficulty', 'all')
         language = request.args.get('language', 'en')
         
@@ -649,7 +722,7 @@ def get_education_modules():
 def track_education_progress():
     """Track user progress in educational modules"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
         
         module_id = data.get('module_id')
@@ -712,7 +785,7 @@ def track_education_progress():
 def get_specific_user_stats(user_id):
     """Get user statistics and progress"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         
         # Users can only access their own stats
         if current_user_id != user_id:
@@ -785,7 +858,7 @@ def get_specific_user_stats(user_id):
 def report_feedback():
     """Submit feedback on verification accuracy"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
         
         verification_id = data.get('verification_id')
@@ -896,7 +969,7 @@ def get_trends():
 def get_educational_content():
     """Get personalized educational content"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
         
         content_type = data.get('content_type', 'module')
