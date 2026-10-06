@@ -1,393 +1,137 @@
 import React from "react";
-import { Box, Container, Typography, Link, Grid, Chip } from "@mui/material";
-import SecurityIcon from "@mui/icons-material/Security";
-import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
-import SchoolIcon from "@mui/icons-material/School";
-import BusinessIcon from "@mui/icons-material/Business";
-import TwitterIcon from "@mui/icons-material/Twitter";
-import LinkedInIcon from "@mui/icons-material/LinkedIn";
-import GitHubIcon from "@mui/icons-material/GitHub";
+import { Box, Container, Typography, Grid, Link, Chip, Divider } from "@mui/material";
+import { Security, FactCheck, Public, School, OpenInNew } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 
 const Footer = () => {
+  const navigate = useNavigate();
+
+  const factCheckPartners = [
+    { name: "PIB Fact Check (भारत सरकार)", url: "https://factcheck.pib.gov.in" },
+    { name: "विश्वास न्यूज़ (Vishvas News)", url: "https://www.vishvasnews.com" },
+    { name: "बूम हिंदी (BOOM FactCheck)", url: "https://hindi.boomlive.in" },
+    { name: "ऑल्ट न्यूज़ हिंदी (Alt News)", url: "https://hindi.altnews.in" },
+  ];
+
   return (
     <Box
       component="footer"
       sx={{
-        backgroundColor: "var(--bg-primary)",
-        borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-        color: "var(--text-primary)",
-        py: 6,
+        backgroundColor: "rgba(10, 12, 16, 0.95)",
+        borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+        color: "#94a3b8",
+        pt: 6,
+        pb: 4,
         mt: "auto",
       }}
     >
       <Container maxWidth="lg">
-        {/* Main Brand Section */}
-        <Box sx={{ mb: 4, display: "flex", alignItems: "center", gap: 2 }}>
-          <Box
-            sx={{
-              width: 48,
-              height: 48,
-              backgroundColor: "var(--brand-red)",
-              borderRadius: "8px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <VerifiedUserIcon sx={{ color: "white", fontSize: 28 }} />
-          </Box>
-          <Box>
-            <Typography
-              variant="h5"
-              sx={{
-                fontFamily: '"IBM Plex Sans", sans-serif',
-                fontWeight: 600,
-                color: "var(--text-primary)",
-                mb: 0.5,
-              }}
-            >
-              2025 MitraVerify
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Top Verification Categories */}
-        <Box sx={{ mb: 4 }}>
-          <Typography
-            variant="h6"
-            sx={{
-              color: "var(--text-primary)",
-              mb: 2,
-              fontFamily: '"IBM Plex Sans", sans-serif',
-              fontWeight: 500,
-            }}
-          >
-            Top Categories
-          </Typography>
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-            {[
-              "News",
-              "Health",
-              "Politics",
-              "Science",
-              "Technology",
-              "Social Media",
-              "Images",
-              "Videos",
-              "WhatsApp",
-              "Facebook",
-              "Twitter",
-              "Instagram",
-            ].map((category) => (
-              <Chip
-                key={category}
-                label={category}
-                size="small"
+        <Grid container spacing={4} mb={4}>
+          {/* Brand Info */}
+          <Grid item xs={12} md={5}>
+            <Box display="flex" alignItems="center" gap={1.5} mb={2}>
+              <Box
                 sx={{
-                  backgroundColor: "var(--bg-secondary)",
-                  color: "var(--text-secondary)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  "&:hover": {
-                    backgroundColor: "var(--bg-tertiary)",
-                    color: "var(--text-primary)",
-                  },
+                  width: 36,
+                  height: 36,
+                  borderRadius: "8px",
+                  background: "linear-gradient(135deg, #00d4ff 0%, #3b82f6 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
-              />
-            ))}
-          </Box>
-        </Box>
+              >
+                <Security sx={{ color: "#ffffff", fontSize: 20 }} />
+              </Box>
+              <Typography variant="h6" sx={{ color: "#f8fafc", fontWeight: 700 }}>
+                MitraVerify
+              </Typography>
+            </Box>
+            <Typography variant="body2" sx={{ color: "#94a3b8", lineHeight: 1.7, mb: 2 }}>
+              High-accuracy Hindi and Indian regional language verification platform engineered to detect
+              phishing emails, WhatsApp forwards, lottery scams, and financial fraud using Devanagari tokenization,
+              N-grams, TF-IDF vectorization, and Multinomial Naive Bayes classification.
+            </Typography>
+            <Chip
+              label="100% Client Privacy • Local NLP Engine"
+              size="small"
+              sx={{
+                backgroundColor: "rgba(0, 212, 255, 0.08)",
+                color: "#38bdf8",
+                border: "1px solid rgba(0, 212, 255, 0.2)",
+                fontSize: "0.75rem",
+              }}
+            />
+          </Grid>
 
-        {/* Footer Links */}
-        <Grid container spacing={4} sx={{ mb: 4 }}>
+          {/* Quick Links */}
           <Grid item xs={12} sm={6} md={3}>
-            <Typography
-              variant="h6"
-              sx={{
-                color: "var(--text-primary)",
-                mb: 2,
-                fontFamily: '"IBM Plex Sans", sans-serif',
-                fontWeight: 500,
-                fontSize: "1rem",
-              }}
-            >
-              PLATFORM
+            <Typography variant="subtitle2" sx={{ color: "#f8fafc", fontWeight: 700, mb: 2 }}>
+              NAVIGATION
             </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Box display="flex" flexDirection="column" gap={1}>
               <Link
-                href="/verify"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
+                component="button"
+                onClick={() => navigate("/")}
+                sx={{ color: "#94a3b8", textAlign: "left", textDecoration: "none", "&:hover": { color: "#00d4ff" } }}
               >
-                Fact Check
+                Verification Console
               </Link>
               <Link
-                href="/history"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
+                component="button"
+                onClick={() => navigate("/nlp-basics")}
+                sx={{ color: "#94a3b8", textAlign: "left", textDecoration: "none", "&:hover": { color: "#00d4ff" } }}
               >
-                Verification History
+                NLP Architecture
               </Link>
               <Link
-                href="/dashboard"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
+                component="button"
+                onClick={() => navigate("/about")}
+                sx={{ color: "#94a3b8", textAlign: "left", textDecoration: "none", "&:hover": { color: "#00d4ff" } }}
               >
-                Dashboard
+                About MitraVerify
               </Link>
             </Box>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
-            <Typography
-              variant="h6"
-              sx={{
-                color: "var(--text-primary)",
-                mb: 2,
-                fontFamily: '"IBM Plex Sans", sans-serif',
-                fontWeight: 500,
-                fontSize: "1rem",
-              }}
-            >
-              DEVELOPERS
+          {/* Fact Check Resources */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Typography variant="subtitle2" sx={{ color: "#f8fafc", fontWeight: 700, mb: 2 }}>
+              VERIFICATION & CYBER DEFENSE
             </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <Link
-                href="/about"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
-              >
-                About
-              </Link>
-              <Link
-                href="/contact"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
-              >
-                Partner Schools
-              </Link>
-              <Link
-                href="#"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
-              >
-                Get Hired
-              </Link>
-            </Box>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Typography
-              variant="h6"
-              sx={{
-                color: "var(--text-primary)",
-                mb: 2,
-                fontFamily: '"IBM Plex Sans", sans-serif',
-                fontWeight: 500,
-                fontSize: "1rem",
-              }}
-            >
-              EDUCATORS
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <Link
-                href="/learn"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
-              >
-                Learning Modules
-              </Link>
-              <Link
-                href="#"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
-              >
-                Assess Students
-              </Link>
-            </Box>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Typography
-              variant="h6"
-              sx={{
-                color: "var(--text-primary)",
-                mb: 2,
-                fontFamily: '"IBM Plex Sans", sans-serif',
-                fontWeight: 500,
-                fontSize: "1rem",
-              }}
-            >
-              COMPANIES
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <Link
-                href="#"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
-              >
-                Skill Assessments
-              </Link>
-              <Link
-                href="#"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
-              >
-                Find Candidates
-              </Link>
+            <Box display="flex" flexDirection="column" gap={1}>
+              {factCheckPartners.map((item, idx) => (
+                <Link
+                  key={idx}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{
+                    color: "#94a3b8",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.5,
+                    textDecoration: "none",
+                    "&:hover": { color: "#00d4ff" },
+                  }}
+                >
+                  {item.name} <OpenInNew sx={{ fontSize: 13, ml: 0.5 }} />
+                </Link>
+              ))}
             </Box>
           </Grid>
         </Grid>
 
-        {/* Bottom Section */}
-        <Box
-          sx={{
-            borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-            pt: 3,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 2,
-          }}
-        >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              flexWrap: "wrap",
-            }}
-          >
-            <Typography
-              variant="body2"
-              sx={{
-                color: "var(--text-secondary)",
-                fontFamily: '"IBM Plex Sans", sans-serif',
-              }}
-            >
-              © 2025 MitraVerify. All rights reserved.
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                color: "var(--text-secondary)",
-                fontFamily: '"IBM Plex Sans", sans-serif',
-              }}
-            >
-              Built for Google Cloud Hackathon 2025
-            </Typography>
-            <Box sx={{ display: "flex", gap: 2 }}>
-              <Link
-                href="/privacy"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  fontSize: "0.875rem",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                href="/terms"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  fontSize: "0.875rem",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
-              >
-                Terms of Service
-              </Link>
-              <Link
-                href="/about"
-                sx={{
-                  color: "var(--text-secondary)",
-                  textDecoration: "none",
-                  fontSize: "0.875rem",
-                  "&:hover": { color: "var(--text-primary)" },
-                }}
-              >
-                About
-              </Link>
-            </Box>
-          </Box>
+        <Divider sx={{ borderColor: "rgba(255, 255, 255, 0.08)", mb: 3 }} />
 
-          {/* Social Links */}
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <Link
-              href="#"
-              sx={{
-                color: "var(--text-secondary)",
-                "&:hover": { color: "var(--text-primary)" },
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 32,
-                height: 32,
-              }}
-            >
-              <TwitterIcon fontSize="small" />
-            </Link>
-            <Link
-              href="#"
-              sx={{
-                color: "var(--text-secondary)",
-                "&:hover": { color: "var(--text-primary)" },
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 32,
-                height: 32,
-              }}
-            >
-              <LinkedInIcon fontSize="small" />
-            </Link>
-            <Link
-              href="#"
-              sx={{
-                color: "var(--text-secondary)",
-                "&:hover": { color: "var(--text-primary)" },
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 32,
-                height: 32,
-              }}
-            >
-              <GitHubIcon fontSize="small" />
-            </Link>
-          </Box>
+        {/* Bottom copyright */}
+        <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+          <Typography variant="caption" sx={{ color: "#64748b" }}>
+            © 2026 MitraVerify. Developed for Indian Language Misinformation & Spam Defense.
+          </Typography>
+          <Typography variant="caption" sx={{ color: "#64748b" }}>
+            NLP Architecture: Devanagari Tokenization • TF-IDF • MultinomialNB
+          </Typography>
         </Box>
       </Container>
     </Box>

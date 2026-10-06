@@ -5,7 +5,7 @@ import axios from "axios";
 
 // API configuration
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+  process.env.REACT_APP_API_URL || "http://127.0.0.1:5001/api";
 
 // Configure axios defaults
 axios.defaults.baseURL = API_BASE_URL;
@@ -111,11 +111,21 @@ const authReducer = (state, action) => {
   }
 };
 
+// Get valid stored token helper
+const getValidStoredToken = () => {
+  const token = localStorage.getItem("token");
+  if (!token || token === "undefined" || token === "null" || token.trim() === "") {
+    localStorage.removeItem("token");
+    return null;
+  }
+  return token;
+};
+
 // Initial auth state
 const initialAuthState = {
   isAuthenticated: false,
   user: null,
-  token: localStorage.getItem("token"),
+  token: getValidStoredToken(),
   loading: false,
   error: null,
   message: null,
@@ -132,7 +142,7 @@ export const AuthProvider = ({ children }) => {
     const requestInterceptor = axios.interceptors.request.use(
       (config) => {
         const token = state.token || localStorage.getItem("token");
-        if (token) {
+        if (token && token !== "undefined" && token !== "null" && token.trim() !== "") {
           config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
@@ -406,7 +416,7 @@ export const AuthProvider = ({ children }) => {
     refetch: refetchStats,
   } = useQuery(
     ["userStats", state.user?.id],
-    () => axios.get("/api/auth/stats").then((res) => res.data),
+    () => axios.get("/auth/stats").then((res) => res.data),
     {
       enabled: !!state.isAuthenticated && !!state.user,
       staleTime: 5 * 60 * 1000, // 5 minutes,

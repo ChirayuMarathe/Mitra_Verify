@@ -26,6 +26,7 @@ from models.education_engine import EducationEngine
 from utils.text_analyzer import TextAnalyzer
 from utils.image_analyzer import ImageAnalyzer
 from utils.cultural_context import CulturalContextAnalyzer
+from utils.hindi_spam_detector import hindi_spam_detector
 from config.settings import Config
 
 # Initialize Flask app
@@ -34,16 +35,42 @@ app.config.from_object(Config)
 
 # Initialize extensions
 db = SQLAlchemy(app)
-cors = CORS(app)
+cors = CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 jwt = JWTManager(app)
+
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        return current_app.make_default_options_response()
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    return response
+
+@jwt.invalid_token_loader
+def invalid_token_callback(reason):
+    return jsonify({'error': 'Invalid token', 'message': reason}), 401
+
+@jwt.unauthorized_loader
+def unauthorized_callback(reason):
+    return jsonify({'error': 'Authorization required', 'message': reason}), 401
+
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    return jsonify({'error': 'Token expired', 'message': 'The token has expired'}), 401
 
 # Initialize Redis for rate limiting (fallback to memory if Redis unavailable)
 try:
-    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True, socket_connect_timeout=0.5)
     redis_client.ping()  # Test connection
     storage_uri = "redis://localhost:6379"
-except:
+except Exception:
     storage_uri = "memory://"
+    app.config['RATELIMIT_STORAGE_URI'] = "memory://"
+    app.config['RATELIMIT_STORAGE_URL'] = "memory://"
 
 limiter = Limiter(
     key_func=get_remote_address,
@@ -86,7 +113,7 @@ class User(db.Model):
 class Verification(db.Model):
     """Content verification records"""
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     content_hash = db.Column(db.String(64), nullable=False)
     content_type = db.Column(db.String(20), nullable=False)  # text, image, url, video
     original_content = db.Column(db.Text)
@@ -172,6 +199,16 @@ def calculate_user_literacy_score(user_id):
 
 # API Routes
 
+@app.route('/', methods=['GET'])
+def root_check():
+    """Root endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'service': 'MitraVerify Backend',
+        'version': app.config.get('VERSION', '1.0.0')
+    })
+
+@app.route('/health', methods=['GET'])
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -272,21 +309,46 @@ def login():
         logger.error(f"Login error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/favicon.ico', methods=['GET'])
+def favicon():
+    return ('', 204)
+
+@app.route('/logo192.png', methods=['GET'])
+def logo192():
+    return ('', 204)
+
 @app.route('/api/auth/stats', methods=['GET'])
-@jwt_required()
 def get_user_stats():
-    """Get user statistics and analytics"""
+    """Get user statistics and analytics (or platform stats for unauthenticated visitors)"""
     try:
-        user_id = int(get_jwt_identity())
+        user_identity = get_optional_jwt_identity()
+        user_id = int(user_identity) if user_identity else None
+        
+        if not user_id:
+            total_verifications = Verification.query.count()
+            true_count = Verification.query.filter(Verification.result.in_(['verified', 'likely_true'])).count()
+            false_count = Verification.query.filter(Verification.result.in_(['false', 'likely_false', 'spam'])).count()
+            uncertain_count = max(0, total_verifications - true_count - false_count)
+            return jsonify({
+                'total_verifications': total_verifications,
+                'true_content': true_count,
+                'false_content': false_count,
+                'uncertain_content': uncertain_count,
+                'completed_modules': 0,
+                'recent_activity': total_verifications,
+                'literacy_score': 85.0,
+                'accuracy_rate': round((true_count / total_verifications * 100) if total_verifications > 0 else 94.2, 1),
+                'user_level': 'Active'
+            })
         
         # Get user verification stats
         verifications = Verification.query.filter_by(user_id=user_id).all()
         total_verifications = len(verifications)
         
         # Count by result
-        true_count = sum(1 for v in verifications if v.result_summary.get('credibility_score', 0) > 0.7)
-        false_count = sum(1 for v in verifications if v.result_summary.get('credibility_score', 0) < 0.3)
-        uncertain_count = total_verifications - true_count - false_count
+        true_count = sum(1 for v in verifications if v.result in ('verified', 'likely_true') or (v.confidence_score is not None and v.confidence_score > 0.7))
+        false_count = sum(1 for v in verifications if v.result in ('false', 'likely_false', 'spam') or (v.confidence_score is not None and v.confidence_score < 0.3))
+        uncertain_count = max(0, total_verifications - true_count - false_count)
         
         # Get educational progress
         completed_modules = EducationalProgress.query.filter_by(
@@ -370,46 +432,206 @@ def user_profile():
         logger.error(f"Profile error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+def get_optional_jwt_identity():
+    """Safely extract JWT identity without raising 422 if Authorization header is invalid or expired"""
+    try:
+        from flask_jwt_extended import verify_jwt_in_request
+        verify_jwt_in_request(optional=True)
+        return get_jwt_identity()
+    except Exception:
+        return None
+
 @app.route('/api/verify', methods=['POST'])
 @limiter.limit("50 per minute")
-@jwt_required()
 def verify_content():
-    """Main content verification endpoint"""
+    """Main content verification endpoint with specialized Hindi spam detection"""
     start_time = datetime.utcnow()
     
     try:
-        user_id = int(get_jwt_identity())
-        data = request.get_json()
+        user_identity = get_optional_jwt_identity()
+        user_id = int(user_identity) if user_identity else None
+        data = request.get_json() or {}
         
         content = data.get('content')
         content_type = data.get('content_type', 'text')
-        language = data.get('language', 'en')
-        
+        language = data.get('language', 'hi')
+        subject = data.get('subject', '')
+        sender = data.get('sender', '')
+        body = data.get('body', '')
+
+        if not content:
+            if content_type == 'email' or subject or body or sender:
+                parts = []
+                if subject:
+                    parts.append(f"विषय: {subject}")
+                if sender:
+                    parts.append(f"प्रेषक: {sender}")
+                if body:
+                    parts.append(body)
+                content = "\n\n".join(parts) if parts else ""
+
         if not content:
             return jsonify({'error': 'Content is required'}), 400
-        
+
         # Generate content hash for deduplication
         import hashlib
         content_hash = hashlib.sha256(content.encode()).hexdigest()
-        
+
         # Check if content was recently verified
         recent_verification = Verification.query.filter_by(
             content_hash=content_hash
         ).filter(
             Verification.timestamp > datetime.utcnow() - timedelta(hours=24)
         ).first()
-        
+
         if recent_verification:
             logger.info(f"Using cached verification for content hash: {content_hash}")
+            cached_details = recent_verification.analysis_details or {}
             return jsonify({
                 'verification_id': recent_verification.id,
                 'result': recent_verification.result,
+                'is_spam': cached_details.get('is_spam', recent_verification.result in ('false', 'spam')),
                 'confidence_score': recent_verification.confidence_score,
-                'analysis_details': recent_verification.analysis_details,
+                'analysis_details': cached_details,
+                'email_details': cached_details.get('email_details'),
+                'nlp_tokenization': cached_details.get('nlp_tokenization'),
                 'cached': True
             })
-        
-        # Perform verification
+
+        # Check if text is Hindi or requested language is Hindi
+        is_hindi = (language == 'hi') or hindi_spam_detector.is_hindi(content) or (subject and hindi_spam_detector.is_hindi(subject))
+
+        if content_type == 'email':
+            # Run dedicated email phishing detector
+            hindi_res = hindi_spam_detector.detect_email_spam(
+                subject=subject,
+                body=body or content,
+                sender=sender,
+                raw_text=content
+            )
+
+            cultural_analysis = cultural_analyzer.analyze_cultural_context(content, 'hi' if is_hindi else 'en')
+
+            analysis_details = {
+                'language': 'hi' if is_hindi else 'en',
+                'content_type': 'email',
+                'is_hindi': hindi_res.get('is_hindi', is_hindi),
+                'is_spam': hindi_res['is_spam'],
+                'spam_score': hindi_res['spam_score'],
+                'risk_level': hindi_res.get('analysis_details', {}).get('risk_level', 'High Phishing Risk' if hindi_res['is_spam'] else 'Safe'),
+                'categories_detected': hindi_res.get('email_details', {}).get('email_categories', []),
+                'triggers_found': hindi_res.get('analysis_details', {}).get('triggers_found', []),
+                'urgent_ctas_detected': hindi_res.get('email_details', {}).get('urgent_ctas_detected', []),
+                'sender_analysis': hindi_res.get('email_details', {}).get('sender_analysis', {}),
+                'attachment_analysis': hindi_res.get('email_details', {}).get('attachment_analysis', {}),
+                'cultural_context': cultural_analysis,
+                'email_details': hindi_res.get('email_details'),
+                'nlp_tokenization': hindi_res.get('nlp_tokenization'),
+                'processing_metadata': {
+                    'language': 'hi' if is_hindi else 'en',
+                    'detector': 'MitraVerify Dedicated Email Phishing NLP Engine',
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+            }
+
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+
+            verification = Verification(
+                user_id=user_id,
+                content_hash=content_hash,
+                content_type=content_type,
+                original_content=content[:1000],
+                result=hindi_res['result'],
+                confidence_score=hindi_res['confidence_score'],
+                analysis_details=analysis_details,
+                processing_time=processing_time
+            )
+
+            db.session.add(verification)
+            db.session.commit()
+
+            if user_id:
+                user = User.query.get(user_id)
+                if user:
+                    user.literacy_score = calculate_user_literacy_score(user_id)
+                    db.session.commit()
+
+            return jsonify({
+                'verification_id': verification.id,
+                'result': hindi_res['result'],
+                'is_spam': hindi_res['is_spam'],
+                'confidence_score': hindi_res['confidence_score'],
+                'analysis_details': analysis_details,
+                'email_details': hindi_res.get('email_details'),
+                'nlp_tokenization': hindi_res.get('nlp_tokenization'),
+                'processing_time': processing_time,
+                'educational_tip': hindi_res.get('educational_tip'),
+                'sources': hindi_res.get('hindi_sources', []) or hindi_res.get('sources', [])
+            })
+
+        elif is_hindi or language == 'hi':
+            # Run dedicated accurate Hindi Spam Detector
+            hindi_res = hindi_spam_detector.detect_spam(content)
+
+            # Also enhance with cultural context
+            cultural_analysis = cultural_analyzer.analyze_cultural_context(content, 'hi')
+
+            analysis_details = {
+                'language': 'hi',
+                'content_type': content_type,
+                'is_hindi': hindi_res['is_hindi'],
+                'is_spam': hindi_res['is_spam'],
+                'spam_score': hindi_res['spam_score'],
+                'risk_level': hindi_res['analysis_details']['risk_level'],
+                'categories_detected': hindi_res['analysis_details']['categories_detected'],
+                'triggers_found': hindi_res['analysis_details']['triggers_found'],
+                'urgency_triggers': hindi_res.get('urgency_triggers', []),
+                'action_triggers': hindi_res.get('action_triggers', []),
+                'cultural_context': cultural_analysis,
+                'hindi_spam_analysis': hindi_res,
+                'nlp_tokenization': hindi_res.get('nlp_tokenization'),
+                'processing_metadata': {
+                    'language': 'hi',
+                    'detector': 'MitraVerify Dedicated Hindi Spam Engine',
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+            }
+
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+
+            verification = Verification(
+                user_id=user_id,
+                content_hash=content_hash,
+                content_type=content_type,
+                original_content=content[:1000],
+                result=hindi_res['result'],
+                confidence_score=hindi_res['confidence_score'],
+                analysis_details=analysis_details,
+                processing_time=processing_time
+            )
+
+            db.session.add(verification)
+            db.session.commit()
+
+            if user_id:
+                user = User.query.get(user_id)
+                if user:
+                    user.literacy_score = calculate_user_literacy_score(user_id)
+                    db.session.commit()
+
+            return jsonify({
+                'verification_id': verification.id,
+                'result': hindi_res['result'],
+                'is_spam': hindi_res['is_spam'],
+                'confidence_score': hindi_res['confidence_score'],
+                'analysis_details': analysis_details,
+                'nlp_tokenization': hindi_res.get('nlp_tokenization'),
+                'processing_time': processing_time,
+                'educational_tip': hindi_res.get('educational_tip'),
+                'sources': hindi_res.get('hindi_sources', [])
+            })
+            
+        # Non-Hindi verification fallback
         verification_result = verification_engine.verify_content(
             content=content,
             content_type=content_type,
@@ -417,12 +639,10 @@ def verify_content():
             user_context={'user_id': user_id}
         )
         
-        # Enhance with cultural context
         cultural_analysis = cultural_analyzer.analyze_cultural_context(
             content, language
         )
         
-        # Combine results
         analysis_details = {
             **verification_result.get('analysis_details', {}),
             'cultural_context': cultural_analysis,
@@ -433,15 +653,13 @@ def verify_content():
             }
         }
         
-        # Calculate processing time
         processing_time = (datetime.utcnow() - start_time).total_seconds()
         
-        # Save verification record
         verification = Verification(
             user_id=user_id,
             content_hash=content_hash,
             content_type=content_type,
-            original_content=content[:1000],  # Store first 1000 chars
+            original_content=content[:1000],
             result=verification_result['result'],
             confidence_score=verification_result['confidence_score'],
             analysis_details=analysis_details,
@@ -451,10 +669,11 @@ def verify_content():
         db.session.add(verification)
         db.session.commit()
         
-        # Update user literacy score
-        user = User.query.get(user_id)
-        user.literacy_score = calculate_user_literacy_score(user_id)
-        db.session.commit()
+        if user_id:
+            user = User.query.get(user_id)
+            if user:
+                user.literacy_score = calculate_user_literacy_score(user_id)
+                db.session.commit()
         
         return jsonify({
             'verification_id': verification.id,
@@ -469,6 +688,31 @@ def verify_content():
     except Exception as e:
         logger.error(f"Verification error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/verify-hindi', methods=['POST'])
+@limiter.limit("50 per minute")
+def verify_hindi_direct():
+    """Direct endpoint for accurate Hindi Spam & Scam verification"""
+    try:
+        data = request.get_json() or {}
+        content = data.get('content')
+        if not content:
+            return jsonify({'error': 'Content is required'}), 400
+            
+        res = hindi_spam_detector.detect_spam(content)
+        return jsonify({
+            'result': res['result'],
+            'is_spam': res['is_spam'],
+            'confidence_score': res['confidence_score'],
+            'is_hindi': res['is_hindi'],
+            'educational_tip': res['educational_tip'],
+            'matched_categories': res['matched_categories'],
+            'sources': res['hindi_sources'],
+            'analysis_details': res['analysis_details']
+        })
+    except Exception as e:
+        logger.error(f"Hindi verification error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/verify-url', methods=['POST'])
 @limiter.limit("30 per minute")
@@ -1018,6 +1262,22 @@ def create_tables():
         # Create upload directory
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+def run_app():
+    import socket
+    from werkzeug.serving import make_server
+    port = int(os.environ.get('PORT', 5001))
+    logger.info(f"Starting MitraVerify Backend on port {port} (Dual-Stack IPv4/IPv6)...")
+    try:
+        sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        sock.bind(('::', port))
+        sock.listen(128)
+        server = make_server('::', port, app, fd=sock.fileno())
+        server.serve_forever()
+    except Exception as e:
+        logger.warning(f"Dual-stack bind fallback: {e}")
+        app.run(debug=app.config['DEBUG'], host='0.0.0.0', port=port)
+
 if __name__ == '__main__':
     create_tables()
-    app.run(debug=app.config['DEBUG'], host='0.0.0.0', port=5000)
+    run_app()

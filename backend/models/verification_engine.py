@@ -30,6 +30,7 @@ from fake_useragent import UserAgent
 
 from utils.text_analyzer import TextAnalyzer
 from utils.cultural_context import CulturalContextAnalyzer
+from utils.hindi_spam_detector import hindi_spam_detector
 
 # Download required NLTK data
 try:
@@ -54,6 +55,7 @@ class VerificationEngine:
         """Initialize the verification engine with AI models and analyzers."""
         self.text_analyzer = TextAnalyzer()
         self.cultural_analyzer = CulturalContextAnalyzer()
+        self.hindi_spam_detector = hindi_spam_detector
         self.user_agent = UserAgent()
         
         # Load spaCy models
@@ -557,6 +559,28 @@ class VerificationEngine:
         
         # Generate fact-checking suggestions
         result['sources'] = self._suggest_fact_check_sources(content, language)
+
+        # Dedicated High-Accuracy Hindi Spam & Email Phishing Detection
+        is_hindi_content = (language == 'hi') or self.hindi_spam_detector.is_hindi(content)
+        if is_hindi_content or language == 'hi':
+            if content_type == 'email' or (user_context and 'subject' in user_context):
+                sub = user_context.get('subject', '') if user_context else ''
+                snd = user_context.get('sender', '') if user_context else ''
+                hindi_res = self.hindi_spam_detector.detect_email_spam(subject=sub, body=content, sender=snd, raw_text=content)
+            else:
+                hindi_res = self.hindi_spam_detector.detect_spam(content)
+            analysis_details['hindi_spam_analysis'] = hindi_res
+            analysis_details['is_hindi'] = hindi_res['is_hindi']
+            
+            # Apply dedicated Hindi model verdict
+            result['result'] = hindi_res['result']
+            result['confidence_score'] = hindi_res['confidence_score']
+            result['educational_tip'] = hindi_res['educational_tip']
+            result['sources'] = hindi_res['hindi_sources']
+            result['nlp_tokenization'] = hindi_res.get('nlp_tokenization')
+            result['email_details'] = hindi_res.get('email_details')
+            if hindi_res.get('matched_categories'):
+                analysis_details['spam_categories'] = [c['name_hi'] for c in hindi_res['matched_categories']]
         
         return result
     

@@ -43,15 +43,30 @@
   --accent-yellow: #f59e0b;        /* Warning/questionable */
   --accent-red: #ef4444;           /* Error/false */
   
+  /* Modern High-Tech Neon & Status Tokens */
+  --neon-blue: #00d4ff;
+  --neon-cyan: #38bdf8;
+  --neon-green: #10b981;
+  --neon-purple: #a855f7;
+  --status-verified: #10b981;
+  --status-questionable: #f59e0b;
+  --status-false: #ef4444;
+  --status-processing: #00d4ff;
+  --glow-blue: 0 0 20px rgba(0, 212, 255, 0.35);
+  --glow-green: 0 0 20px rgba(16, 185, 129, 0.35);
+  --glow-orange: 0 0 20px rgba(245, 158, 11, 0.35);
+  --glow-red: 0 0 20px rgba(239, 68, 68, 0.35);
+  --glow-cyan: 0 0 20px rgba(56, 189, 248, 0.35);
+
   /* Border colors */
-  --border-primary: #374151;       /* Main borders */
-  --border-secondary: #4b5563;     /* Secondary borders */
-  --border-focus: var(--brand-red); /* Focus states */
-  
+  --border-primary: rgba(255, 255, 255, 0.12);
+  --border-secondary: rgba(255, 255, 255, 0.2);
+  --border-focus: var(--neon-blue);
+
   /* Shadows & effects */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.3);
   --shadow-red-glow: 0 0 20px rgba(204, 41, 54, 0.3);
   
   /* Transitions */

@@ -1,18 +1,26 @@
 // API service for MitraVerify frontend
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+  process.env.REACT_APP_API_URL || "http://127.0.0.1:5001/api";
 
 class ApiService {
   constructor() {
-    this.token = localStorage.getItem("token");
+    const saved = localStorage.getItem("token");
+    if (!saved || saved === "undefined" || saved === "null" || saved.trim() === "") {
+      localStorage.removeItem("token");
+      this.token = null;
+    } else {
+      this.token = saved;
+    }
   }
 
   async request(endpoint, options = {}) {
+    const token = this.token || localStorage.getItem("token");
+    const hasValidToken = token && token !== "undefined" && token !== "null" && token.trim() !== "";
     const url = `${API_BASE_URL}${endpoint}`;
     const config = {
       headers: {
         "Content-Type": "application/json",
-        ...(this.token && { Authorization: `Bearer ${this.token}` }),
+        ...(hasValidToken && { Authorization: `Bearer ${token}` }),
         ...options.headers,
       },
       ...options,
@@ -37,10 +45,11 @@ class ApiService {
 
   // Update token
   setToken(token) {
-    this.token = token;
-    if (token) {
+    if (token && token !== "undefined" && token !== "null" && token.trim() !== "") {
+      this.token = token;
       localStorage.setItem("token", token);
     } else {
+      this.token = null;
       localStorage.removeItem("token");
     }
   }

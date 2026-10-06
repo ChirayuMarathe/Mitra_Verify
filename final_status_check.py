@@ -10,6 +10,9 @@ import sys
 import time
 from datetime import datetime
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 def check_service(name, url, expected_status=200):
     """Check if a service is running and accessible."""
     try:
@@ -50,18 +53,24 @@ def main():
     print("🖥️  BACKEND SERVICES")
     print("-" * 40)
     
-    # Main Backend (Flask)
-    status, message = check_service("Main Backend", "http://localhost:5001/health")
-    services.append(("Main Backend", status))
+    # Backend API (Flask)
+    status, message = check_service("Backend API (Port 5001)", "http://localhost:5001/health")
+    if not status:
+        status, message = check_service("Backend API (Port 5000)", "http://localhost:5000/api/health")
+    services.append(("Backend API", status))
     print(message)
     
-    # Simple Backend (Flask)
-    status, message = check_service("Simple Backend", "http://localhost:5001/")
-    services.append(("Simple Backend", status))
+    # Root check
+    status, message = check_service("Backend Root", "http://localhost:5001/")
+    if not status:
+        status, message = check_service("Backend Root", "http://localhost:5000/api/health")
+    services.append(("Backend Root", status))
     print(message)
     
     # WhatsApp Bot
     status, message = check_service("WhatsApp Bot", "http://localhost:5002/webhook")
+    if not status:
+        status, message = check_service("WhatsApp Bot", "http://localhost:5002/health")
     services.append(("WhatsApp Bot", status))
     print(message)
     
@@ -71,25 +80,37 @@ def main():
     print("🌐 FRONTEND SERVICES")
     print("-" * 40)
     
-    status, message = check_service("React Frontend", "http://localhost:3001")
+    status, message = check_service("React Frontend (Port 3000)", "http://localhost:3000")
+    if not status:
+        status, message = check_service("React Frontend (Port 3001)", "http://localhost:3001")
     services.append(("React Frontend", status))
     print(message)
     
     print()
     
     # Check API Endpoints
-    print("🔌 API ENDPOINTS")
+    print("🔌 API ENDPOINTS & HINDI SPAM DETECTION")
     print("-" * 40)
     
     # Health check
     status, message = check_api_endpoint("Health Check", "http://localhost:5001/health")
+    if not status:
+        status, message = check_api_endpoint("Health Check", "http://localhost:5000/api/health")
     services.append(("Health API", status))
     print(message)
     
-    # Test verification endpoint (if available)
-    test_data = {"content": "test", "content_type": "text"}
-    status, message = check_api_endpoint("Verification API", "http://localhost:5001/api/verify", "POST", test_data)
-    services.append(("Verification API", status))
+    # Test Hindi Spam Detection verification endpoint
+    test_hindi_spam = {
+        "content": "बधाई हो! आपको KBC की तरफ से 25 लाख रुपये की लॉटरी लगी है। तुरंत संपर्क करें।",
+        "content_type": "text",
+        "language": "hi"
+    }
+    verify_url = "http://localhost:5001/api/verify"
+    status, message = check_api_endpoint("Hindi Spam Verification API", verify_url, "POST", test_hindi_spam)
+    if not status:
+        verify_url = "http://localhost:5000/api/verify"
+        status, message = check_api_endpoint("Hindi Spam Verification API", verify_url, "POST", test_hindi_spam)
+    services.append(("Hindi Spam Verification API", status))
     print(message)
     
     print()

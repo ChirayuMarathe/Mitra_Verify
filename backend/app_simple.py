@@ -19,6 +19,8 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 
+from utils.hindi_spam_detector import hindi_spam_detector
+
 # Basic configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///mitraverify_test.db')
@@ -52,6 +54,7 @@ class Verification(db.Model):
 
 # API Routes
 @app.route('/api/health', methods=['GET'])
+@app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
     return jsonify({
@@ -60,41 +63,48 @@ def health_check():
         'version': '1.0.0'
     })
 
+@app.route('/', methods=['GET'])
+def root_check():
+    return jsonify({
+        'status': 'healthy',
+        'service': 'MitraVerify Simple Backend',
+        'timestamp': datetime.utcnow().isoformat()
+    })
+
 @app.route('/api/verify', methods=['POST'])
 def verify_content():
-    """Simple content verification endpoint"""
+    """Content verification endpoint with accurate Hindi spam detection"""
     try:
         data = request.get_json()
-        if not data or 'content' not in data:
-            return jsonify({'error': 'Content is required'}), 400
+        if not data or ('content' not in data and 'body' not in data and 'subject' not in data):
+            return jsonify({'error': 'Content or Email body/subject is required'}), 400
         
-        content = data['content']
+        content = data.get('content', '')
+        if not content:
+            content = f"विषय: {data.get('subject', '')}\nप्रेषक: {data.get('sender', '')}\n\n{data.get('body', '')}".strip()
+        content_type = data.get('content_type', 'text')
         
-        # Simple verification logic
-        # Check for obvious spam/misinformation patterns
-        suspicious_words = ['urgent', 'breaking', 'secret', 'conspiracy', 'leaked']
-        suspicious_count = sum(1 for word in suspicious_words if word.lower() in content.lower())
-        
-        if suspicious_count >= 2:
-            result = 'questionable'
-            confidence = 0.8
-        elif suspicious_count == 1:
-            result = 'questionable'
-            confidence = 0.6
+        # Check using dedicated accurate Hindi Spam Detector
+        if content_type == 'email' or 'subject' in data or 'sender' in data:
+            subject = data.get('subject', '')
+            body = data.get('body', content)
+            sender = data.get('sender', '')
+            hindi_res = hindi_spam_detector.detect_email_spam(
+                subject=subject, body=body, sender=sender, raw_text=content
+            )
         else:
-            result = 'verified'
-            confidence = 0.7
+            hindi_res = hindi_spam_detector.detect_spam(content)
+
+        result = hindi_res['result']
+        confidence = hindi_res['confidence_score']
         
         # Save verification
         verification = Verification(
-            content=content[:500],  # Store first 500 chars
+            content=content[:500] if content else f"Subject: {data.get('subject', '')}",
             result=result,
             confidence_score=confidence,
-            content_type='text',
-            analysis_details=str({
-                'suspicious_words_found': suspicious_count,
-                'content_length': len(content)
-            })
+            content_type=content_type,
+            analysis_details=str(hindi_res['analysis_details'])
         )
         db.session.add(verification)
         db.session.commit()
@@ -102,11 +112,14 @@ def verify_content():
         return jsonify({
             'verification_id': verification.id,
             'result': result,
+            'is_spam': hindi_res['is_spam'],
             'confidence_score': confidence,
-            'analysis_details': {
-                'suspicious_words_found': suspicious_count,
-                'content_length': len(content)
-            }
+            'content_type': hindi_res.get('content_type', content_type),
+            'educational_tip': hindi_res['educational_tip'],
+            'sources': hindi_res['hindi_sources'],
+            'analysis_details': hindi_res['analysis_details'],
+            'nlp_tokenization': hindi_res['nlp_tokenization'],
+            'email_details': hindi_res.get('email_details')
         })
     
     except Exception as e:

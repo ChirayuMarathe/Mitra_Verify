@@ -59,6 +59,10 @@ import {
   Timeline,
   TrendingUp,
   School,
+  Email as EmailIcon,
+  AlternateEmail,
+  AttachFile,
+  MarkEmailRead,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import apiService from "../services/api";
@@ -82,11 +86,14 @@ const VerifyPage = () => {
   const { user } = useAuth();
   const [tabValue, setTabValue] = useState(0);
   const [textContent, setTextContent] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailSender, setEmailSender] = useState("");
+  const [emailBody, setEmailBody] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [urlContent, setUrlContent] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
-  const [language, setLanguage] = useState("auto");
+  const [language, setLanguage] = useState("hi");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [userRating, setUserRating] = useState(0);
   const [userComment, setUserComment] = useState("");
@@ -129,6 +136,9 @@ const VerifyPage = () => {
     setTabValue(newValue);
     setVerificationResult(null);
     setTextContent("");
+    setEmailSubject("");
+    setEmailSender("");
+    setEmailBody("");
     setSelectedFile(null);
     setUrlContent("");
   };
@@ -142,6 +152,23 @@ const VerifyPage = () => {
     verifyMutation.mutate({
       content: textContent,
       content_type: "text",
+      language: language === "auto" ? "auto-detect" : language,
+    });
+  };
+
+  const handleEmailVerification = () => {
+    if (!emailSubject.trim() && !emailBody.trim()) return;
+
+    setVerifying(true);
+    setVerificationResult(null);
+
+    const fullContent = `विषय: ${emailSubject}\nप्रेषक: ${emailSender}\n\n${emailBody}`.trim();
+    verifyMutation.mutate({
+      subject: emailSubject,
+      sender: emailSender,
+      body: emailBody,
+      content: fullContent,
+      content_type: "email",
       language: language === "auto" ? "auto-detect" : language,
     });
   };
@@ -178,15 +205,14 @@ const VerifyPage = () => {
   const getResultColor = (result) => {
     switch (result) {
       case "verified":
-        return "success";
       case "likely_true":
         return "success";
+      case "questionable":
       case "uncertain":
         return "warning";
       case "likely_false":
-        return "error";
       case "false":
-        return "error";
+      case "spam":
       case "error":
         return "error";
       default:
@@ -199,10 +225,12 @@ const VerifyPage = () => {
       case "verified":
       case "likely_true":
         return <CheckCircle />;
+      case "questionable":
       case "uncertain":
         return <Warning />;
       case "likely_false":
       case "false":
+      case "spam":
         return <Error />;
       default:
         return <Info />;
@@ -212,15 +240,17 @@ const VerifyPage = () => {
   const getResultText = (result) => {
     switch (result) {
       case "verified":
-        return "Verified True";
+        return "Verified Legitimate & Safe";
       case "likely_true":
-        return "Likely True";
+        return "Likely Authentic";
+      case "questionable":
       case "uncertain":
-        return "Uncertain";
+        return "Suspicious / Unverified Content";
       case "likely_false":
-        return "Likely False";
+        return "Likely Deceptive";
       case "false":
-        return "False/Misleading";
+      case "spam":
+        return "Phishing / Spam Detected";
       default:
         return "Analysis Complete";
     }
@@ -234,7 +264,6 @@ const VerifyPage = () => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    // You could add a toast notification here
   };
 
   const handleShare = () => {
@@ -250,7 +279,6 @@ const VerifyPage = () => {
   };
 
   const submitFeedback = () => {
-    // In a real app, you'd submit this to your API
     console.log("Feedback submitted:", {
       rating: userRating,
       comment: userComment,
@@ -260,87 +288,176 @@ const VerifyPage = () => {
     setUserComment("");
   };
 
-  const sampleTexts = [
-    "Breaking: Government announces new policy that will shock everyone!",
-    "Scientists discover miracle cure that doctors don't want you to know about",
-    "The Reserve Bank of India announced new monetary policy measures to control inflation",
-    "WhatsApp will start charging users from next month - Share to save your account",
+  const sampleCases = [
+    {
+      title: "KBC ₹25 Lakh Lottery Scam",
+      tag: "Lottery Fraud",
+      isSpam: true,
+      text: "बधाई हो! आपने KBC (कौन बनेगा करोड़पति) में 25 लाख रुपये की लॉटरी जीती है। अपनी धनराशि प्राप्त करने के लिए तुरंत इस नंबर +919876543210 पर व्हाट्सएप करें या लिंक पर क्लिक करें।",
+    },
+    {
+      title: "Free 3-Month 5G Recharge Scam",
+      tag: "Free Recharge Fraud",
+      isSpam: true,
+      text: "सभी भारतीय नागरिकों को 3 महीने का 5G फ्री रिचार्ज दिया जा रहा है। ऑफर केवल आज रात 12 बजे तक मान्य है। तुरंत नीचे दिए गए लिंक पर क्लिक करके अपना मोबाइल नंबर दर्ज करें: http://free-5g-recharge.xyz",
+    },
+    {
+      title: "PM Free Laptop Yojana Scam",
+      tag: "Fake Govt Scheme",
+      isSpam: true,
+      text: "प्रधानमंत्री फ्री लैपटॉप योजना 2026 के तहत सभी 10वीं और 12वीं पास छात्रों को मुफ्त लैपटॉप बांटे जा रहे हैं। आवेदन करने और सूची में नाम देखने के लिए तुरंत फॉर्म भरें।",
+    },
+    {
+      title: "Electricity Disconnection Threat",
+      tag: "Utility Bill Phishing",
+      isSpam: true,
+      text: "प्रिय उपभोक्ता, आपका पिछला बिजली बिल अपडेट न होने के कारण आज रात 9:30 बजे बिजली काट दी जाएगी। तुरंत हमारे बिजली अधिकारी से संपर्क करें और यह APK फाइल डाउनलोड करें।",
+    },
+    {
+      title: "Miracle Herbal Cure Scam",
+      tag: "Fake Medical Claim",
+      isSpam: true,
+      text: "इस चमत्कारी नुस्खे से केवल 3 दिनों में ब्लड शुगर और डायबिटीज हमेशा के लिए जड़ से खत्म! इसे तुरंत 10 लोगों को शेयर करें।",
+    },
+    {
+      title: "RBI Monetary Policy Repo Rate Notice",
+      tag: "Official News (Safe)",
+      isSpam: false,
+      text: "भारतीय रिजर्व बैंक (RBI) ने मौद्रिक नीति समिति की बैठक में प्रमुख रेपो दर को 6.5 प्रतिशत पर अपरिवर्तित रखने का निर्णय लिया है।",
+    },
+    {
+      title: "IMD Heavy Rain Alert Notice",
+      tag: "Official Alert (Safe)",
+      isSpam: false,
+      text: "मौसम विभाग (IMD) ने तटीय क्षेत्रों में अगले 48 घंटों में भारी बारिश और तेज हवाओं की चेतावनी जारी की है। नागरिकों को सावधानी बरतने की सलाह दी गई है।",
+    },
+  ];
+
+  const sampleEmailCases = [
+    {
+      title: "Income Tax Refund Phishing Email",
+      tag: "Tax Refund Scam",
+      isSpam: true,
+      subject: "आयकर विभाग (IT Dept): आपका ₹42,500 का टैक्स रिफंड स्वीकृत",
+      sender: "refund-tax@incometax-gov-update.xyz",
+      body: "प्रिय करदाता,\n\nआपके वित्तीय वर्ष 2024-25 का आयकर रिफंड स्वीकृत कर दिया गया है। कुल रिफंड राशि: ₹42,500।\nराशि सीधे बैंक खाते में प्राप्त करने के लिए कृपया नीचे दिए गए लिंक पर अपने नेट बैंकिंग क्रेडेंशियल और पैन कार्ड से 24 घंटे के भीतर लॉगिन करें:\nhttp://it-refund-portal.xyz/claim\n\nओटीपी दर्ज करने के 2 घंटे के भीतर रिफंड राशि जमा कर दी जाएगी।",
+    },
+    {
+      title: "SBI NetBanking Block Threat Email",
+      tag: "Banking Phishing",
+      isSpam: true,
+      subject: "तत्काल सूचना: आपका एसबीआई खाता 24 घंटे में ब्लॉक हो जाएगा",
+      sender: "security-alerts@sbi-online-update.top",
+      body: "प्रिय ग्राहक,\n\nभारतीय स्टेट बैंक (SBI) द्वारा आपका नेट बैंकिंग खाता निष्क्रिय किया जा रहा है क्योंकि आपका पैन कार्ड और ई-केवाईसी अपडेट नहीं है।\nअपने खाते को ब्लॉक होने से बचाने के लिए तुरंत संलग्न सुरक्षा फॉर्म डाउनलोड करें अथवा नीचे दिए गए लिंक पर लॉगिन करके सत्यापन पूरा करें:\nhttp://sbi-kyc-verify.top/login\n\nअनदेखा करने पर आपका डेबिट कार्ड भी बंद कर दिया जाएगा।",
+    },
+    {
+      title: "Google India WFH Job Scam Email",
+      tag: "Fake Job Offer",
+      isSpam: true,
+      subject: "बधाई! गूगल इंडिया में डाटा एंट्री जॉब ऑफर लेटर - मासिक वेतन ₹50,000",
+      sender: "hr-careers@google-india-jobs.work",
+      body: "प्रिय उम्मीदवार,\n\nआपका चयन गूगल इंडिया में वर्क फ्रॉम होम (घर बैठे काम) डाटा एंट्री ऑपरेटर पद के लिए हो गया है।\nमासिक वेतन: ₹50,000 + लैपटॉप व इंटरनेट भत्ता।\nअपना जॉब ऑफर लेटर डाउनलोड करने और पहचान सत्यापन के लिए केवल ₹999 का पंजीकरण शुल्क तुरंत जमा करें। ऑफर केवल आज रात 12 बजे तक मान्य है।",
+    },
+    {
+      title: "HDFC Pre-Approved Credit Card Phishing",
+      tag: "Credit Card Fraud",
+      isSpam: true,
+      subject: "विशेष ऑफर: प्री-एप्रूव्ड एचडीएफसी क्रेडिट कार्ड ₹5,00,000 लिमिट",
+      sender: "card-approval@hdfc-offers.click",
+      body: "प्रिय उपभोक्ता,\n\nआपके अच्छे क्रेडिट स्कोर के आधार पर आपको ₹5 लाख की पूर्व-स्वीकृत सीमा वाला लाइफटाइम फ्री क्रेडिट कार्ड दिया जा रहा है।\nकार्ड तुरंत एक्टिवेट करने के लिए लिंक पर क्लिक करके अपना बैंक विवरण और सीवीवी दर्ज करें।",
+    },
+    {
+      title: "Genuine SBI UPI Transaction Alert",
+      tag: "Legitimate Alert (Safe)",
+      isSpam: false,
+      subject: "आपके खाते से ₹1,500 का यूपीआई भुगतान सफल",
+      sender: "alerts@sbi.co.in",
+      body: "प्रिय ग्राहक,\n\nआपके खाता संख्या XXXXXXXX1234 से ₹1,500.00 का यूपीआई डेबिट सफलतापूर्वक संपन्न हुआ है।\nसंदर्भ संख्या (UTR): 402910482910।\nदिनांक: 06-10-2026 18:24 IST।\nउपलब्ध शेष राशि: ₹18,450.00।\nयदि आपने यह लेन-देन नहीं किया है, तो तुरंत 1800-11-2211 पर कॉल करें।",
+    },
+    {
+      title: "Genuine Income Tax ITR-V Receipt",
+      tag: "Official Receipt (Safe)",
+      isSpam: false,
+      subject: "आयकर विवरणी (ITR) सत्यापन पावती वर्ष 2025-26",
+      sender: "donotreply@incometax.gov.in",
+      body: "प्रिय करदाता,\n\nनिर्धारण वर्ष 2025-26 के लिए आपकी आयकर विवरणी (ITR-1) सफलतापूर्वक ई-सत्यापित हो गई है।\nस्वीकृति संख्या: 8920192837492।\nआप ई-फाइलिंग पोर्टल पर लॉगिन करके अपनी पावती (ITR-V) डाउनलोड कर सकते हैं।\nयह एक प्रणाली-जनित ईमेल है, इसका उत्तर न दें।",
+    },
   ];
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
       <Box mb={4} textAlign="center" className="fade-in">
+        <Chip
+          label="AI Threat Intelligence • Hindi & Regional Language Security"
+          size="small"
+          sx={{
+            mb: 2,
+            backgroundColor: "rgba(0, 212, 255, 0.08)",
+            color: "#38bdf8",
+            border: "1px solid rgba(0, 212, 255, 0.25)",
+            fontWeight: 600,
+            fontSize: "0.8rem",
+          }}
+        />
         <Typography
           variant="h2"
           component="h1"
           sx={{
-            fontSize: { xs: "2.5rem", md: "3.5rem" },
-            fontWeight: 700,
-            background: `linear-gradient(135deg, var(--neon-blue), var(--neon-cyan))`,
+            fontSize: { xs: "2.3rem", md: "3.25rem" },
+            fontWeight: 800,
+            letterSpacing: "-0.03em",
+            background: `linear-gradient(135deg, #f8fafc 30%, #38bdf8 100%)`,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
-            marginBottom: 2,
-            textShadow: "var(--glow-blue)",
+            mb: 1.5,
           }}
         >
-          Content Verification Center
+          MitraVerify
         </Typography>
         <Typography
-          variant="h5"
+          variant="h6"
           sx={{
             color: "var(--text-secondary)",
             mb: 3,
             fontWeight: 400,
+            maxWidth: 780,
+            mx: "auto",
+            fontSize: { xs: "0.95rem", md: "1.1rem" },
+            lineHeight: 1.6,
           }}
         >
-          Analyze text, images, and URLs for misinformation using AI-powered
-          tools
+          Accurate spam, phishing email, and scam verification engine for Hindi, Hinglish, and Indian regional languages powered by first-principles NLP (Devanagari Tokenization, Stopwords Filtering, TF-IDF Vectorization, and Multinomial Naive Bayes).
         </Typography>
-        <Box display="flex" justifyContent="center" gap={2} flexWrap="wrap">
+        <Box display="flex" justifyContent="center" gap={1.5} flexWrap="wrap">
           <Chip
-            icon={<Security />}
-            label="AI-Powered Analysis"
-            className="status-badge"
+            icon={<Security sx={{ color: "#00d4ff !important" }} />}
+            label="Devanagari & Latin NLP Engine"
             sx={{
-              backgroundColor: "var(--status-processing)",
-              color: "var(--text-primary)",
-              border: "1px solid var(--status-processing)",
+              backgroundColor: "rgba(0, 212, 255, 0.1)",
+              color: "#f8fafc",
+              border: "1px solid rgba(0, 212, 255, 0.2)",
               fontWeight: 500,
-              "&:hover": {
-                boxShadow: "var(--glow-blue)",
-                transform: "translateY(-2px)",
-              },
             }}
           />
           <Chip
-            icon={<Analysis />}
-            label="Real-time Results"
-            className="status-badge"
+            icon={<Analysis sx={{ color: "#10b981 !important" }} />}
+            label="Real-time Token Inspector"
             sx={{
-              backgroundColor: "var(--status-verified)",
-              color: "var(--text-primary)",
-              border: "1px solid var(--status-verified)",
+              backgroundColor: "rgba(16, 185, 129, 0.1)",
+              color: "#f8fafc",
+              border: "1px solid rgba(16, 185, 129, 0.2)",
               fontWeight: 500,
-              "&:hover": {
-                boxShadow: "var(--glow-green)",
-                transform: "translateY(-2px)",
-              },
             }}
           />
           <Chip
-            icon={<School />}
-            label="Educational Insights"
-            className="status-badge"
+            icon={<School sx={{ color: "#a855f7 !important" }} />}
+            label="Cyber Defense & PIB Connected"
             sx={{
-              backgroundColor: "var(--neon-purple)",
-              color: "var(--text-primary)",
-              border: "1px solid var(--neon-purple)",
+              backgroundColor: "rgba(168, 85, 247, 0.1)",
+              color: "#f8fafc",
+              border: "1px solid rgba(168, 85, 247, 0.2)",
               fontWeight: 500,
-              "&:hover": {
-                boxShadow: "0 0 20px rgba(168, 85, 247, 0.4)",
-                transform: "translateY(-2px)",
-              },
             }}
           />
         </Box>
@@ -390,8 +507,9 @@ const VerifyPage = () => {
               },
             }}
           >
-            <Tab icon={<Article />} label="Text Content" iconPosition="start" />
-            <Tab icon={<ImageIcon />} label="Images" iconPosition="start" />
+            <Tab icon={<Article />} label="Text & WhatsApp Messages" iconPosition="start" />
+            <Tab icon={<EmailIcon />} label="Spam & Phishing Email" iconPosition="start" />
+            <Tab icon={<ImageIcon />} label="Image OCR" iconPosition="start" />
             <Tab
               icon={<LinkIcon />}
               label="URLs & Links"
@@ -541,51 +659,261 @@ const VerifyPage = () => {
                 >
                   <Typography
                     variant="h6"
-                    gutterBottom
-                    sx={{ color: "var(--text-primary)" }}
+                    sx={{ color: "var(--text-primary)", fontWeight: 700, mb: 0.5 }}
                   >
-                    Try Sample Texts
+                    Quick Test Cases
                   </Typography>
                   <Typography
-                    variant="body2"
-                    sx={{ color: "var(--text-secondary)", mb: 2 }}
+                    variant="caption"
+                    sx={{ color: "var(--text-secondary)", display: "block", mb: 2 }}
                   >
-                    Click on any sample to test our verification system:
+                    Click any scenario to populate the Hindi NLP detector:
                   </Typography>
-                  {sampleTexts.map((sample, index) => (
-                    <Button
-                      key={index}
-                      variant="outlined"
-                      fullWidth
-                      className="btn-neon-outline"
-                      sx={{
-                        mb: 1,
-                        textAlign: "left",
-                        justifyContent: "flex-start",
-                        height: "auto",
-                        py: 1.5,
-                        borderColor: "var(--border-primary)",
-                        color: "var(--text-secondary)",
-                        "&:hover": {
-                          borderColor: "var(--neon-blue)",
-                          backgroundColor: "rgba(0, 212, 255, 0.05)",
-                          color: "var(--neon-blue)",
-                        },
-                      }}
-                      onClick={() => setTextContent(sample)}
-                    >
-                      <Typography
-                        variant="body2"
+
+                  <Box display="flex" flexDirection="column" gap={1.5}>
+                    {sampleCases.map((sample, index) => (
+                      <Paper
+                        key={index}
+                        onClick={() => setTextContent(sample.text)}
                         sx={{
-                          textOverflow: "ellipsis",
-                          overflow: "hidden",
-                          whiteSpace: "nowrap",
+                          p: 1.8,
+                          cursor: "pointer",
+                          backgroundColor: "var(--bg-secondary)",
+                          border: "1px solid var(--border-primary)",
+                          borderRadius: "10px",
+                          transition: "all 0.2s ease",
+                          "&:hover": {
+                            borderColor: sample.isSpam ? "var(--status-false)" : "var(--status-verified)",
+                            backgroundColor: "rgba(255, 255, 255, 0.03)",
+                            transform: "translateX(4px)",
+                          },
                         }}
                       >
-                        {sample.substring(0, 50)}...
-                      </Typography>
-                    </Button>
-                  ))}
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                          <Typography variant="subtitle2" sx={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "0.88rem" }}>
+                            {sample.title}
+                          </Typography>
+                          <Chip
+                            label={sample.tag}
+                            size="small"
+                            sx={{
+                              fontSize: "0.7rem",
+                              height: 20,
+                              fontWeight: 600,
+                              backgroundColor: sample.isSpam ? "rgba(239, 68, 68, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                              color: sample.isSpam ? "#f87171" : "#34d399",
+                              border: sample.isSpam ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgba(16, 185, 129, 0.3)",
+                            }}
+                          />
+                        </Box>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: "var(--text-tertiary)",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {sample.text}
+                        </Typography>
+                      </Paper>
+                    ))}
+                  </Box>
+                </Paper>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </TabPanel>
+
+        {/* Email Spam & Phishing Verification Tab */}
+        <TabPanel value={tabValue} index={1}>
+          <CardContent sx={{ p: 4 }}>
+            <Grid container spacing={4}>
+              <Grid item xs={12} md={8}>
+                <Box mb={2}>
+                  <TextField
+                    fullWidth
+                    label="Email Subject"
+                    placeholder="e.g. आयकर विभाग: आपका ₹42,500 का टैक्स रिफंड स्वीकृत"
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    variant="outlined"
+                    sx={{
+                      mb: 2,
+                      "& .MuiOutlinedInput-root": {
+                        backgroundColor: "var(--bg-tertiary)",
+                        borderRadius: "10px",
+                        border: "1px solid var(--border-primary)",
+                        "& fieldset": { border: "none" },
+                        "&:hover": { borderColor: "var(--neon-blue)" },
+                        "&.Mui-focused": { borderColor: "var(--neon-blue)" },
+                      },
+                    }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Sender Email Address"
+                    placeholder="e.g. refund-tax@incometax-gov-update.xyz or alerts@sbi.co.in"
+                    value={emailSender}
+                    onChange={(e) => setEmailSender(e.target.value)}
+                    variant="outlined"
+                    sx={{
+                      mb: 2,
+                      "& .MuiOutlinedInput-root": {
+                        backgroundColor: "var(--bg-tertiary)",
+                        borderRadius: "10px",
+                        border: "1px solid var(--border-primary)",
+                        "& fieldset": { border: "none" },
+                        "&:hover": { borderColor: "var(--neon-blue)" },
+                        "&.Mui-focused": { borderColor: "var(--neon-blue)" },
+                      },
+                    }}
+                  />
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={7}
+                    label="Email Body / Content"
+                    placeholder="Paste the full email text, including links, attachment names, or instructions..."
+                    value={emailBody}
+                    onChange={(e) => setEmailBody(e.target.value)}
+                    variant="outlined"
+                    sx={{
+                      mb: 2.5,
+                      "& .MuiOutlinedInput-root": {
+                        backgroundColor: "var(--bg-tertiary)",
+                        borderRadius: "12px",
+                        border: "2px solid var(--border-primary)",
+                        "& fieldset": { border: "none" },
+                        "&:hover": { borderColor: "var(--neon-blue)" },
+                        "&.Mui-focused": { borderColor: "var(--neon-blue)" },
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Box display="flex" gap={2} alignItems="center" mb={3}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<EmailIcon />}
+                    onClick={handleEmailVerification}
+                    disabled={(!emailSubject.trim() && !emailBody.trim()) || verifying}
+                    sx={{
+                      ml: "auto",
+                      minWidth: 240,
+                      height: 48,
+                      fontSize: "1rem",
+                      fontWeight: 600,
+                      background: "linear-gradient(135deg, #00d4ff 0%, #0088ff 100%)",
+                      color: "#0a0c10",
+                      "&:hover": {
+                        background: "linear-gradient(135deg, #38bdf8 0%, #00d4ff 100%)",
+                      },
+                    }}
+                  >
+                    {verifying ? "Analyzing Email..." : "Analyze Email for Spam"}
+                  </Button>
+                </Box>
+
+                {verifying && (
+                  <Box mb={3} className="glass-card" sx={{ p: 3, borderRadius: "12px" }}>
+                    <LinearProgress
+                      sx={{
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: "var(--bg-tertiary)",
+                        "& .MuiLinearProgress-bar": {
+                          background: `linear-gradient(90deg, var(--neon-blue), var(--neon-cyan))`,
+                        },
+                      }}
+                    />
+                    <Typography variant="body2" textAlign="center" mt={2} sx={{ color: "var(--text-secondary)" }}>
+                      Analyzing email headers, sender domain reputation, and Devanagari phishing hooks...
+                    </Typography>
+                  </Box>
+                )}
+              </Grid>
+
+              {/* Email Sample Cases Sidebar */}
+              <Grid item xs={12} md={4}>
+                <Paper
+                  sx={{
+                    p: 3,
+                    background: "var(--bg-tertiary)",
+                    border: "1px solid var(--border-primary)",
+                    borderRadius: "12px",
+                  }}
+                >
+                  <Typography variant="h6" sx={{ color: "var(--text-primary)", fontWeight: 700, mb: 0.5 }}>
+                    Email Phishing Test Cases
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "var(--text-secondary)", display: "block", mb: 2 }}>
+                    Click any sample to test Hindi spam email detection:
+                  </Typography>
+
+                  <Box display="flex" flexDirection="column" gap={1.5}>
+                    {sampleEmailCases.map((sample, index) => (
+                      <Paper
+                        key={index}
+                        onClick={() => {
+                          setEmailSubject(sample.subject);
+                          setEmailSender(sample.sender);
+                          setEmailBody(sample.body);
+                        }}
+                        sx={{
+                          p: 1.8,
+                          cursor: "pointer",
+                          backgroundColor: "var(--bg-secondary)",
+                          border: "1px solid var(--border-primary)",
+                          borderRadius: "10px",
+                          transition: "all 0.2s ease",
+                          "&:hover": {
+                            borderColor: sample.isSpam ? "var(--status-false)" : "var(--status-verified)",
+                            backgroundColor: "rgba(255, 255, 255, 0.03)",
+                            transform: "translateX(4px)",
+                          },
+                        }}
+                      >
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                          <Typography variant="subtitle2" sx={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "0.85rem" }}>
+                            {sample.title}
+                          </Typography>
+                          <Chip
+                            label={sample.tag}
+                            size="small"
+                            sx={{
+                              fontSize: "0.68rem",
+                              height: 20,
+                              fontWeight: 600,
+                              backgroundColor: sample.isSpam ? "rgba(239, 68, 68, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                              color: sample.isSpam ? "#f87171" : "#34d399",
+                              border: sample.isSpam ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgba(16, 185, 129, 0.3)",
+                            }}
+                          />
+                        </Box>
+                        <Typography variant="caption" sx={{ color: "var(--neon-cyan)", display: "block", mb: 0.5 }}>
+                          Subject: {sample.subject.substring(0, 42)}...
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: "var(--text-tertiary)",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {sample.body}
+                        </Typography>
+                      </Paper>
+                    ))}
+                  </Box>
                 </Paper>
               </Grid>
             </Grid>
@@ -593,7 +921,7 @@ const VerifyPage = () => {
         </TabPanel>
 
         {/* Image Verification Tab */}
-        <TabPanel value={tabValue} index={1}>
+        <TabPanel value={tabValue} index={2}>
           <CardContent sx={{ p: 4 }}>
             <Grid container spacing={4}>
               <Grid item xs={12} md={8}>
@@ -815,7 +1143,7 @@ const VerifyPage = () => {
         </TabPanel>
 
         {/* URL Verification Tab */}
-        <TabPanel value={tabValue} index={2}>
+        <TabPanel value={tabValue} index={3}>
           <CardContent sx={{ p: 4 }}>
             <Grid container spacing={4}>
               <Grid item xs={12} md={8}>
@@ -1136,6 +1464,296 @@ const VerifyPage = () => {
                 </Tooltip>
               </Box>
             </Box>
+
+            {/* Educational Tip Alert */}
+            {verificationResult.educational_tip && (
+              <Alert
+                severity={
+                  verificationResult.result === "verified"
+                    ? "success"
+                    : verificationResult.result === "false"
+                    ? "error"
+                    : "warning"
+                }
+                sx={{
+                  mb: 3,
+                  borderRadius: "12px",
+                  fontSize: "1rem",
+                  lineHeight: 1.6,
+                }}
+              >
+                {verificationResult.educational_tip}
+              </Alert>
+            )}
+
+            {/* Matched Spam/Misinformation Categories */}
+            {verificationResult.analysis_details?.categories_detected?.length > 0 && (
+              <Box mb={3} display="flex" flexWrap="wrap" gap={1} alignItems="center">
+                <Typography variant="body2" sx={{ color: "var(--text-secondary)", mr: 1, fontWeight: 600 }}>
+                  Detected Threat Patterns:
+                </Typography>
+                {verificationResult.analysis_details.categories_detected.map((cat, idx) => (
+                  <Chip
+                    key={idx}
+                    label={cat}
+                    color="error"
+                    size="small"
+                    sx={{ fontWeight: 600, borderRadius: "6px" }}
+                  />
+                ))}
+              </Box>
+            )}
+
+            {/* Email Phishing Diagnostics Panel */}
+            {verificationResult.email_details && (
+              <Accordion
+                defaultExpanded
+                sx={{
+                  mb: 3,
+                  backgroundColor: "var(--bg-tertiary)",
+                  borderRadius: "12px !important",
+                  border: "1px solid var(--border-primary)",
+                  "&:before": { display: "none" },
+                }}
+              >
+                <AccordionSummary expandIcon={<ExpandMore sx={{ color: "var(--neon-blue)" }} />}>
+                  <Box display="flex" alignItems="center" gap={1.5}>
+                    <EmailIcon sx={{ color: "var(--neon-cyan)" }} />
+                    <Typography variant="subtitle1" sx={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                      Email Phishing & Domain Diagnostics
+                    </Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Grid container spacing={2}>
+                    {/* Sender Domain Analysis */}
+                    <Grid item xs={12} md={6}>
+                      <Paper sx={{ p: 2.2, background: "var(--bg-secondary)", borderRadius: "8px", height: "100%", border: "1px solid rgba(255,255,255,0.05)" }}>
+                        <Box display="flex" alignItems="center" gap={1} mb={1}>
+                          <AlternateEmail sx={{ color: verificationResult.email_details.sender_analysis?.is_suspicious ? "#ef4444" : "#10b981", fontSize: 20 }} />
+                          <Typography variant="subtitle2" sx={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                            Sender Domain Reputation
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" sx={{ color: "var(--text-secondary)", display: "block" }}>
+                          Sender: <strong>{verificationResult.email_details.sender || "Not Provided"}</strong>
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "var(--text-tertiary)", display: "block", mb: 1 }}>
+                          Domain: {verificationResult.email_details.sender_analysis?.domain || "N/A"}
+                        </Typography>
+                        <Chip
+                          label={
+                            verificationResult.email_details.sender_analysis?.is_suspicious
+                              ? "🚨 Suspicious / Spoofed Domain"
+                              : verificationResult.email_details.sender_analysis?.is_trusted
+                              ? "✅ Verified Official Domain"
+                              : "Standard Domain"
+                          }
+                          size="small"
+                          sx={{
+                            backgroundColor: verificationResult.email_details.sender_analysis?.is_suspicious
+                              ? "rgba(239, 68, 68, 0.15)"
+                              : "rgba(16, 185, 129, 0.15)",
+                            color: verificationResult.email_details.sender_analysis?.is_suspicious ? "#f87171" : "#34d399",
+                            fontWeight: 600,
+                            mb: 1,
+                          }}
+                        />
+                        <Typography variant="caption" sx={{ color: "var(--text-secondary)", display: "block", lineHeight: 1.5 }}>
+                          {verificationResult.email_details.sender_analysis?.reason}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+
+                    {/* Subject Line & Attachment Hazards */}
+                    <Grid item xs={12} md={6}>
+                      <Paper sx={{ p: 2.2, background: "var(--bg-secondary)", borderRadius: "8px", height: "100%", border: "1px solid rgba(255,255,255,0.05)" }}>
+                        <Box display="flex" alignItems="center" gap={1} mb={1}>
+                          <AttachFile sx={{ color: verificationResult.email_details.attachment_analysis?.has_risky_attachment ? "#ef4444" : "#38bdf8", fontSize: 20 }} />
+                          <Typography variant="subtitle2" sx={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                            Subject Analysis & Attachment Hazards
+                          </Typography>
+                        </Box>
+                        {verificationResult.email_details.subject && (
+                          <Typography variant="caption" sx={{ color: "var(--neon-cyan)", display: "block", mb: 0.5 }}>
+                            Subject: "{verificationResult.email_details.subject}"
+                          </Typography>
+                        )}
+                        <Typography variant="caption" sx={{ color: "var(--text-secondary)", display: "block", mb: 1 }}>
+                          Attachment Status: {verificationResult.email_details.attachment_analysis?.warning}
+                        </Typography>
+                        {verificationResult.email_details.urgent_ctas_detected?.length > 0 && (
+                          <Box mt={1}>
+                            <Typography variant="caption" sx={{ color: "#f87171", fontWeight: 600, display: "block", mb: 0.5 }}>
+                              Urgency & Threat CTAs Detected:
+                            </Typography>
+                            <Box display="flex" flexWrap="wrap" gap={0.5}>
+                              {verificationResult.email_details.urgent_ctas_detected.map((cta, i) => (
+                                <Chip key={i} label={cta} size="small" sx={{ fontSize: "0.7rem", height: 22, backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#fca5a5" }} />
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                </AccordionDetails>
+              </Accordion>
+            )}
+
+            {/* NLP Pipeline Analysis Details */}
+            {verificationResult.nlp_tokenization && (
+              <Accordion
+                defaultExpanded
+                sx={{
+                  mb: 3,
+                  backgroundColor: "var(--bg-tertiary)",
+                  borderRadius: "12px !important",
+                  border: "1px solid var(--border-primary)",
+                  "&:before": { display: "none" },
+                }}
+              >
+                <AccordionSummary expandIcon={<ExpandMore sx={{ color: "var(--neon-blue)" }} />}>
+                  <Box display="flex" alignItems="center" gap={1.5}>
+                    <Analysis sx={{ color: "var(--neon-blue)" }} />
+                    <Typography variant="subtitle1" sx={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                      NLP Pipeline Breakdown
+                    </Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={4}>
+                      <Paper sx={{ p: 2, background: "var(--bg-secondary)", borderRadius: "8px" }}>
+                        <Typography variant="caption" sx={{ color: "var(--text-secondary)" }}>
+                          1. Tokenization
+                        </Typography>
+                        <Typography variant="h6" sx={{ color: "var(--neon-cyan)", my: 0.5 }}>
+                          {verificationResult.nlp_tokenization.raw_tokens_count} Tokens
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "var(--text-tertiary)" }}>
+                          Multi-script Devanagari & word segmentation
+                        </Typography>
+                      </Paper>
+                    </Grid>
+
+                    <Grid item xs={12} sm={4}>
+                      <Paper sx={{ p: 2, background: "var(--bg-secondary)", borderRadius: "8px" }}>
+                        <Typography variant="caption" sx={{ color: "var(--text-secondary)" }}>
+                          2. Stopwords Filtering
+                        </Typography>
+                        <Typography variant="h6" sx={{ color: "var(--neon-green)", my: 0.5 }}>
+                          {verificationResult.nlp_tokenization.filtered_tokens_count} Clean Tokens
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "var(--text-tertiary)" }}>
+                          Grammatical filler words stripped
+                        </Typography>
+                      </Paper>
+                    </Grid>
+
+                    <Grid item xs={12} sm={4}>
+                      <Paper sx={{ p: 2, background: "var(--bg-secondary)", borderRadius: "8px" }}>
+                        <Typography variant="caption" sx={{ color: "var(--text-secondary)" }}>
+                          3. Naive Bayes Probability
+                        </Typography>
+                        <Typography variant="h6" sx={{ color: "var(--neon-purple)", my: 0.5 }}>
+                          {Math.round((verificationResult.nlp_tokenization.ml_naive_bayes_spam_probability || 0) * 100)}% Spam Prob
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "var(--text-tertiary)" }}>
+                          TF-IDF + MultinomialNB Classifier
+                        </Typography>
+                      </Paper>
+                    </Grid>
+
+                    {verificationResult.nlp_tokenization.spam_tokens_detected?.length > 0 && (
+                      <Grid item xs={12}>
+                        <Box sx={{ p: 2, background: "rgba(255, 68, 68, 0.08)", borderRadius: "8px", border: "1px solid rgba(255, 68, 68, 0.2)" }}>
+                          <Typography variant="body2" sx={{ color: "var(--status-false)", fontWeight: 600, mb: 1 }}>
+                            Flagged Spam N-Grams & Fraud Indicators:
+                          </Typography>
+                          <Box display="flex" flexWrap="wrap" gap={1}>
+                            {verificationResult.nlp_tokenization.spam_tokens_detected.map((tok, idx) => (
+                              <Chip
+                                key={idx}
+                                label={tok}
+                                size="small"
+                                sx={{
+                                  backgroundColor: "rgba(255, 68, 68, 0.2)",
+                                  color: "#ff6b6b",
+                                  fontWeight: 600,
+                                }}
+                              />
+                            ))}
+                          </Box>
+                        </Box>
+                      </Grid>
+                    )}
+
+                    {verificationResult.nlp_tokenization.sample_tokens?.length > 0 && (
+                      <Grid item xs={12}>
+                        <Box sx={{ p: 2, background: "var(--bg-secondary)", borderRadius: "8px" }}>
+                          <Typography variant="caption" sx={{ color: "var(--text-secondary)", display: "block", mb: 1 }}>
+                            Processed Informative Tokens:
+                          </Typography>
+                          <Box display="flex" flexWrap="wrap" gap={0.8}>
+                            {verificationResult.nlp_tokenization.sample_tokens.slice(0, 20).map((tok, idx) => (
+                              <Chip
+                                key={idx}
+                                label={tok}
+                                size="small"
+                                variant="outlined"
+                                sx={{ color: "var(--text-primary)", borderColor: "var(--border-primary)" }}
+                              />
+                            ))}
+                          </Box>
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
+                </AccordionDetails>
+              </Accordion>
+            )}
+
+            {/* Fact Check & Cyber Defense Sources */}
+            {verificationResult.sources?.length > 0 && (
+              <Box mb={3}>
+                <Typography variant="subtitle2" sx={{ color: "var(--text-secondary)", mb: 1.5, fontWeight: 600 }}>
+                  Official Verification & Cyber Defense Portals:
+                </Typography>
+                <Grid container spacing={1.5}>
+                  {verificationResult.sources.map((src, idx) => (
+                    <Grid item xs={12} sm={6} key={idx}>
+                      <Paper
+                        component="a"
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{
+                          p: 1.5,
+                          display: "block",
+                          textDecoration: "none",
+                          background: "var(--bg-tertiary)",
+                          border: "1px solid var(--border-primary)",
+                          borderRadius: "8px",
+                          transition: "all 0.2s ease",
+                          "&:hover": {
+                            borderColor: "var(--neon-blue)",
+                            transform: "translateY(-2px)",
+                          },
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ color: "var(--neon-blue)", fontWeight: 600 }}>
+                          {src.name} ↗
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "var(--text-secondary)" }}>
+                          {src.description}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            )}
 
             {/* Processing Time */}
             <Box textAlign="center" mt={4}>

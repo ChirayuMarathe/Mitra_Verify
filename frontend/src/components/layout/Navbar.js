@@ -6,492 +6,229 @@ import {
   Button,
   Box,
   IconButton,
-  Menu,
-  MenuItem,
-  Avatar,
-  Divider,
+  Chip,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
 import {
-  AccountCircle,
-  Dashboard,
   Security,
-  School,
-  History,
-  Settings,
-  ExitToApp,
+  Psychology,
+  Info,
   Menu as MenuIcon,
+  Close as CloseIcon,
+  CheckCircle,
 } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const location = useLocation();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("lg"));
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [mobileMenuAnchor, setMobileMenuAnchor] = useState(null);
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleUserMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
+  const navLinks = [
+    { label: "Verify", path: "/", icon: <Security /> },
+    { label: "NLP Architecture", path: "/nlp-basics", icon: <Psychology /> },
+    { label: "About", path: "/about", icon: <Info /> },
+  ];
 
-  const handleUserMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleMobileMenuOpen = (event) => {
-    setMobileMenuAnchor(event.currentTarget);
-  };
-
-  const handleMobileMenuClose = () => {
-    setMobileMenuAnchor(null);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-    handleUserMenuClose();
-  };
-
-  const handleNavigation = (path) => {
+  const handleNavigate = (path) => {
     navigate(path);
-    handleUserMenuClose();
-    handleMobileMenuClose();
+    setMobileOpen(false);
   };
-
-  // Left side navigation items
-  const leftNavItems = [
-    { label: "Dashboard", path: "/dashboard" },
-    { label: "Verify", path: "/verify" },
-  ];
-
-  // Right side navigation items
-  const rightNavItems = [
-    { label: "Learn", path: "/learn" },
-    { label: "History", path: "/history" },
-    { label: "About", path: "/about" },
-  ];
-
-  const userMenuItems = [
-    { label: "Profile", path: "/profile", icon: <AccountCircle /> },
-    { label: "Settings", path: "/settings", icon: <Settings /> },
-  ];
 
   return (
     <AppBar
       position="sticky"
       elevation={0}
       sx={{
-        background: "linear-gradient(135deg, #0a0a0a 0%, #111111 100%)",
-        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+        backgroundColor: "rgba(10, 12, 16, 0.85)",
+        backdropFilter: "blur(12px)",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
         zIndex: 1100,
       }}
     >
       <Toolbar
         sx={{
-          py: 1.5,
+          py: 1.2,
           px: { xs: 2, md: 4 },
-          maxWidth: "100%",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          maxWidth: "1400px",
           width: "100%",
           margin: "0 auto",
         }}
       >
-        {/* Mobile Menu Button */}
-        {isMobile && (
-          <IconButton
-            onClick={handleMobileMenuOpen}
+        {/* Brand Logo & Title */}
+        <Box
+          onClick={() => handleNavigate("/")}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            cursor: "pointer",
+            userSelect: "none",
+          }}
+        >
+          <Box
             sx={{
-              color: "#ffffff",
-              mr: 2,
-              "&:hover": {
-                backgroundColor: "rgba(255, 255, 255, 0.1)",
-              },
+              width: 40,
+              height: 40,
+              borderRadius: "10px",
+              background: "linear-gradient(135deg, #00d4ff 0%, #3b82f6 100%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 0 15px rgba(0, 212, 255, 0.35)",
+            }}
+          >
+            <Security sx={{ color: "#ffffff", fontSize: 24 }} />
+          </Box>
+          <Box>
+            <Box display="flex" alignItems="center" gap={1}>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: "1.1rem", md: "1.25rem" },
+                  letterSpacing: "-0.02em",
+                  color: "#f8fafc",
+                }}
+              >
+                MitraVerify
+              </Typography>
+            </Box>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "#94a3b8",
+                display: "block",
+                lineHeight: 1,
+                fontSize: "0.72rem",
+              }}
+            >
+              Hindi & Regional Language Spam & Phishing Detection
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Desktop Navigation Links */}
+        {!isMobile ? (
+          <Box display="flex" alignItems="center" gap={1}>
+            {navLinks.map((link) => {
+              const isActive = location.pathname === link.path;
+              return (
+                <Button
+                  key={link.path}
+                  onClick={() => handleNavigate(link.path)}
+                  startIcon={link.icon}
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    borderRadius: "8px",
+                    fontWeight: 600,
+                    fontSize: "0.9rem",
+                    textTransform: "none",
+                    color: isActive ? "#00d4ff" : "#94a3b8",
+                    backgroundColor: isActive
+                      ? "rgba(0, 212, 255, 0.1)"
+                      : "transparent",
+                    border: isActive
+                      ? "1px solid rgba(0, 212, 255, 0.25)"
+                      : "1px solid transparent",
+                    "&:hover": {
+                      color: "#f8fafc",
+                      backgroundColor: "rgba(255, 255, 255, 0.05)",
+                    },
+                  }}
+                >
+                  {link.label}
+                </Button>
+              );
+            })}
+
+            {/* Engine Status Indicator */}
+            <Chip
+              icon={<CheckCircle sx={{ color: "#10b981 !important", fontSize: 16 }} />}
+              label="NLP Engine Active"
+              size="small"
+              sx={{
+                ml: 2,
+                backgroundColor: "rgba(16, 185, 129, 0.12)",
+                color: "#10b981",
+                border: "1px solid rgba(16, 185, 129, 0.25)",
+                fontWeight: 600,
+                fontSize: "0.75rem",
+              }}
+            />
+          </Box>
+        ) : (
+          <IconButton
+            onClick={() => setMobileOpen(true)}
+            sx={{
+              color: "#f8fafc",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              borderRadius: "8px",
             }}
           >
             <MenuIcon />
           </IconButton>
         )}
-
-        {/* Desktop Navigation Layout */}
-        {!isMobile ? (
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              justifyContent: "space-between",
-            }}
-          >
-            {/* Left Navigation */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 3,
-                minWidth: 0,
-                flex: 1,
-              }}
-            >
-              {(user ? leftNavItems : []).map((item) => (
-                <Button
-                  key={item.path}
-                  onClick={() => handleNavigation(item.path)}
-                  sx={{
-                    color: "#ffffff",
-                    textTransform: "none",
-                    fontWeight: 500,
-                    fontSize: "0.95rem",
-                    fontFamily: '"Inter", sans-serif',
-                    px: 0,
-                    py: 1,
-                    minWidth: "auto",
-                    position: "relative",
-                    "&:hover": {
-                      color: "#ffffff",
-                      backgroundColor: "transparent",
-                      "&::after": {
-                        transform: "scaleX(1)",
-                      },
-                    },
-                    "&::after": {
-                      content: '""',
-                      position: "absolute",
-                      bottom: -2,
-                      left: 0,
-                      right: 0,
-                      height: "2px",
-                      backgroundColor: "#ffffff",
-                      transform: "scaleX(0)",
-                      transformOrigin: "center",
-                      transition: "transform 0.2s ease-in-out",
-                    },
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  {item.label}
-                </Button>
-              ))}
-            </Box>
-
-            {/* Center Logo */}
-            <Typography
-              variant="h6"
-              component="div"
-              sx={{
-                cursor: "pointer",
-                fontWeight: 700,
-                color: "#ffffff",
-                fontSize: "1.5rem",
-                fontFamily: '"Inter", sans-serif',
-                letterSpacing: "-0.02em",
-                textAlign: "center",
-                flex: "0 0 auto",
-                mx: 4,
-                "&:hover": {
-                  color: "#f0f0f0",
-                },
-                transition: "color 0.2s ease",
-              }}
-              onClick={() => navigate("/")}
-            >
-              MitraVerify
-            </Typography>
-
-            {/* Right Navigation */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 3,
-                minWidth: 0,
-                flex: 1,
-                justifyContent: "flex-end",
-              }}
-            >
-              {(user ? rightNavItems : rightNavItems).map((item) => (
-                <Button
-                  key={item.path}
-                  onClick={() => handleNavigation(item.path)}
-                  sx={{
-                    color: "#ffffff",
-                    textTransform: "none",
-                    fontWeight: 500,
-                    fontSize: "0.95rem",
-                    fontFamily: '"Inter", sans-serif',
-                    px: 0,
-                    py: 1,
-                    minWidth: "auto",
-                    position: "relative",
-                    "&:hover": {
-                      color: "#ffffff",
-                      backgroundColor: "transparent",
-                      "&::after": {
-                        transform: "scaleX(1)",
-                      },
-                    },
-                    "&::after": {
-                      content: '""',
-                      position: "absolute",
-                      bottom: -2,
-                      left: 0,
-                      right: 0,
-                      height: "2px",
-                      backgroundColor: "#ffffff",
-                      transform: "scaleX(0)",
-                      transformOrigin: "center",
-                      transition: "transform 0.2s ease-in-out",
-                    },
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  {item.label}
-                </Button>
-              ))}
-
-              {/* Auth Buttons */}
-              <Box
-                sx={{ ml: 2, display: "flex", alignItems: "center", gap: 1 }}
-              >
-                {user ? (
-                  <IconButton onClick={handleUserMenuOpen} sx={{ p: 0 }}>
-                    <Avatar
-                      sx={{
-                        width: 32,
-                        height: 32,
-                        bgcolor: "#cc2936",
-                        fontSize: "0.875rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {user.username?.charAt(0).toUpperCase()}
-                    </Avatar>
-                  </IconButton>
-                ) : (
-                  <>
-                    <Button
-                      onClick={() => navigate("/login")}
-                      sx={{
-                        color: "#ffffff",
-                        textTransform: "none",
-                        fontWeight: 500,
-                        fontSize: "0.95rem",
-                        fontFamily: '"Inter", sans-serif',
-                        px: 2,
-                        py: 1,
-                        "&:hover": {
-                          backgroundColor: "rgba(255, 255, 255, 0.1)",
-                        },
-                      }}
-                    >
-                      Login
-                    </Button>
-                    <Button
-                      onClick={() => navigate("/register")}
-                      sx={{
-                        backgroundColor: "#cc2936",
-                        color: "#ffffff",
-                        textTransform: "none",
-                        fontWeight: 600,
-                        fontSize: "0.95rem",
-                        fontFamily: '"Inter", sans-serif',
-                        px: 2.5,
-                        py: 1,
-                        borderRadius: "6px",
-                        "&:hover": {
-                          backgroundColor: "#e63946",
-                          boxShadow: "0 0 20px rgba(204, 41, 54, 0.3)",
-                        },
-                        transition: "all 0.2s ease",
-                      }}
-                    >
-                      Sign up
-                    </Button>
-                  </>
-                )}
-              </Box>
-            </Box>
-          </Box>
-        ) : (
-          /* Mobile Layout */
-          <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-            <Typography
-              variant="h6"
-              component="div"
-              sx={{
-                cursor: "pointer",
-                fontWeight: 700,
-                color: "#ffffff",
-                fontSize: "1.25rem",
-                fontFamily: '"Inter", sans-serif',
-                flexGrow: 1,
-                textAlign: "center",
-                "&:hover": {
-                  color: "#f0f0f0",
-                },
-                transition: "color 0.2s ease",
-              }}
-              onClick={() => navigate("/")}
-            >
-              MitraVerify
-            </Typography>
-
-            {/* Mobile Auth Buttons */}
-            {user ? (
-              <IconButton onClick={handleUserMenuOpen} sx={{ p: 0 }}>
-                <Avatar
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    bgcolor: "#cc2936",
-                    fontSize: "0.875rem",
-                    fontWeight: 600,
-                  }}
-                >
-                  {user.username?.charAt(0).toUpperCase()}
-                </Avatar>
-              </IconButton>
-            ) : (
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <Button
-                  onClick={() => navigate("/login")}
-                  sx={{
-                    color: "#ffffff",
-                    textTransform: "none",
-                    fontWeight: 500,
-                    fontSize: "0.875rem",
-                    px: 1.5,
-                    py: 0.5,
-                    minWidth: "auto",
-                  }}
-                >
-                  Login
-                </Button>
-                <Button
-                  onClick={() => navigate("/register")}
-                  sx={{
-                    backgroundColor: "#cc2936",
-                    color: "#ffffff",
-                    textTransform: "none",
-                    fontWeight: 600,
-                    fontSize: "0.875rem",
-                    px: 1.5,
-                    py: 0.5,
-                    borderRadius: "6px",
-                    minWidth: "auto",
-                    "&:hover": {
-                      backgroundColor: "#e63946",
-                    },
-                  }}
-                >
-                  Sign up
-                </Button>
-              </Box>
-            )}
-          </Box>
-        )}
-
-        {/* User Dropdown Menu */}
-        {user && (
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleUserMenuClose}
-            anchorOrigin={{
-              vertical: "bottom",
-              horizontal: "right",
-            }}
-            transformOrigin={{
-              vertical: "top",
-              horizontal: "right",
-            }}
-            PaperProps={{
-              sx: {
-                backgroundColor: "#1c2128",
-                border: "1px solid #30363d",
-                mt: 1,
-                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
-              },
-            }}
-          >
-            <MenuItem disabled sx={{ color: "#7d8590", fontWeight: 500 }}>
-              {user.username}
-            </MenuItem>
-            <Divider sx={{ borderColor: "#30363d" }} />
-            {userMenuItems.map((item) => (
-              <MenuItem
-                key={item.path}
-                onClick={() => handleNavigation(item.path)}
-                sx={{
-                  color: "#c9d1d9",
-                  "&:hover": { backgroundColor: "#262c36" },
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {item.icon}
-                  {item.label}
-                </Box>
-              </MenuItem>
-            ))}
-            <Divider sx={{ borderColor: "#30363d" }} />
-            <MenuItem
-              onClick={handleLogout}
-              sx={{
-                color: "#c9d1d9",
-                "&:hover": { backgroundColor: "#262c36" },
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <ExitToApp />
-                Logout
-              </Box>
-            </MenuItem>
-          </Menu>
-        )}
-
-        {/* Mobile Navigation Menu */}
-        {isMobile && (
-          <Menu
-            anchorEl={mobileMenuAnchor}
-            open={Boolean(mobileMenuAnchor)}
-            onClose={handleMobileMenuClose}
-            anchorOrigin={{
-              vertical: "bottom",
-              horizontal: "left",
-            }}
-            transformOrigin={{
-              vertical: "top",
-              horizontal: "left",
-            }}
-            PaperProps={{
-              sx: {
-                backgroundColor: "#1c2128",
-                border: "1px solid #30363d",
-                mt: 1,
-                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
-                minWidth: 200,
-              },
-            }}
-          >
-            {[...leftNavItems, ...rightNavItems].map((item) => (
-              <MenuItem
-                key={item.path}
-                onClick={() => handleNavigation(item.path)}
-                sx={{
-                  color: "#c9d1d9",
-                  fontWeight: 500,
-                  "&:hover": { backgroundColor: "#262c36" },
-                }}
-              >
-                {item.label}
-              </MenuItem>
-            ))}
-          </Menu>
-        )}
       </Toolbar>
+
+      {/* Mobile Drawer */}
+      <Drawer
+        anchor="right"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        PaperProps={{
+          sx: {
+            width: 280,
+            backgroundColor: "#0a0c10",
+            borderLeft: "1px solid rgba(255, 255, 255, 0.1)",
+            p: 2,
+          },
+        }}
+      >
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h6" sx={{ color: "#f8fafc", fontWeight: 700 }}>
+            MitraVerify
+          </Typography>
+          <IconButton onClick={() => setMobileOpen(false)} sx={{ color: "#94a3b8" }}>
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        <List>
+          {navLinks.map((link) => (
+            <ListItem key={link.path} disablePadding sx={{ mb: 1 }}>
+              <ListItemButton
+                onClick={() => handleNavigate(link.path)}
+                selected={location.pathname === link.path}
+                sx={{
+                  borderRadius: "8px",
+                  "&.Mui-selected": {
+                    backgroundColor: "rgba(0, 212, 255, 0.1)",
+                    color: "#00d4ff",
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ color: "inherit", minWidth: 40 }}>
+                  {link.icon}
+                </ListItemIcon>
+                <ListItemText primary={link.label} />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Drawer>
     </AppBar>
   );
 };
